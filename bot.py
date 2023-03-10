@@ -14,7 +14,7 @@ from database import orm
 
 
 logging.basicConfig(
-    level=logging.WARNING,
+    level=logging.DEBUG,
     filename = "botlog.log",
     filemode='a',
     format = "%(asctime)s - %(module)s - %(levelname)s - %(funcName)s: %(lineno)d - %(message)s",

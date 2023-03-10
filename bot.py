@@ -169,12 +169,12 @@ async def get_open_report(message: types.Message, state: FSMContext):
     link = state_data.get('waiting_link')
     channel = await client.get_entity(link)
     await bot.send_message(message.chat.id, text='Начинаю парсинг, это может занять от 10 до 15 минут⏱')
-    upload_message = await bot.send_message(message.chat.id, text='Идёт парсинг: 0% [          ]')
+    upload_message = await bot.send_message(message.chat.id, text='Идёт парсинг: 0% [...........]')
     ALL_PARTICIPANTS = []
     for key in bot_settings.QUERY:
         progress = (bot_settings.QUERY.index(key)+1)*100/len(bot_settings.QUERY)
         progress = float('{:.2f}'.format(progress))
-        await upload_message.edit_text(text=f'Идёт парсинг: {progress}% [{"*"*progress/1000}          ]')
+        await upload_message.edit_text(text=f'Идёт парсинг: {progress}% [{"*"*progress/1000}{"."*10-progress/1000}]')
         OFFSET_USER = 0
         while True:
             participants = await client(GetParticipantsRequest(channel,ChannelParticipantsSearch(key), OFFSET_USER, bot_settings.LIMIT_USER, hash=0))

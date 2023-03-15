@@ -16,20 +16,16 @@ async def main_menu():
 async def premium_parsing_menu():
     inline_markup = types.InlineKeyboardMarkup()
     inline_markup.add(types.InlineKeyboardButton(
-            text='👥Собрать всех', 
-            callback_data='private_all'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
             text='📆По дате последнего посещения', 
             callback_data='parsing_activity'
     ))
     inline_markup.add(types.InlineKeyboardButton(
-        text='🗣Из комментариев к постам', 
-        callback_data='parsing_comments'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
         text='✍️Писавшие в чат', 
         callback_data='parsing_in_chat'
+    ))
+    inline_markup.add(types.InlineKeyboardButton(
+        text='📱Моб. телефоны', 
+        callback_data='phones'
     ))
     inline_markup.add(types.InlineKeyboardButton(
         text='🔙Назад', 

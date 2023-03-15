@@ -34,13 +34,6 @@ dp = Dispatcher(bot, storage=storage)
 class ChatOpenLink(StatesGroup):
     waiting_link = State()
 
-class ChatPrivateLink(StatesGroup):
-    waiting_link = State()
-
-class ChatComments(StatesGroup):
-    waiting_link = State()
-    count_posts = State()
-
 class ParsingActive(StatesGroup):
     waiting_link = State()
     last_activity = State()
@@ -91,9 +84,13 @@ async def get_main_menu(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda call: 'premium_menu' in call.data)
 async def get_premium_menu(callback_query: types.CallbackQuery):
-    text = 'Выберите необходимый вариант из списка'
-    inline_markup = await menu.premium_parsing_menu()
-    await callback_query.message.edit_text(text, reply_markup=inline_markup, parse_mode='Markdown')
+    if orm.check_premium(callback_query.from_user.id) == 1:
+        text = 'Выберите необходимый вариант из списка'
+        inline_markup = await menu.premium_parsing_menu()
+        await callback_query.message.edit_text(text, reply_markup=inline_markup, parse_mode='Markdown')
+    else:
+        text = 'Данная функция доступна только премиум пользователям'
+        await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
 
 '''Кнопка для открытого парсинга'''
 
@@ -102,18 +99,6 @@ async def parsing_open_start(callback_query: types.CallbackQuery):
     text = 'Отправьте ссылку на ваш чат в формате *t.mе/durоv* или *@durоv*'
     await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
     await ChatOpenLink.waiting_link.set()
-
-'''Кнопка собрать всех'''
-
-@dp.callback_query_handler(lambda call: 'private_all' in call.data)
-async def parsing_all_start(callback_query: types.CallbackQuery):
-    if orm.check_premium(callback_query.from_user.id) == 1:
-        text = 'Отправьте ссылку на приватный чат в формате:\n*https://t.me/abc123* либо *https://t.me/joinchat/abc123*'
-        await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
-        await ChatPrivateLink.waiting_link.set()
-    else:
-        text = 'Данная функция доступна только премиум пользователям'
-        await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
 
 '''Кнопка по дате последнего посещения'''
 
@@ -132,26 +117,6 @@ async def get_private_report(message: types.Message, state: FSMContext):
     text = 'За какой промежуток времени пользователи должны были быть онлайн?'
     await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
     await ParsingActive.last_activity.set()
-
-'''Кнопка парсинга по комментариям'''
-
-@dp.callback_query_handler(lambda call: 'parsing_comments' in call.data)
-async def parsing_comments_start(callback_query: types.CallbackQuery):
-    if orm.check_premium(callback_query.from_user.id) == 1:
-        text = 'Отправьте ссылку на канал *в котором есть комментарии* и я выдам всех пользователей писавших комментарии'
-        await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
-        await ChatComments.waiting_link.set()
-    else:
-        text = 'Данная функция доступна только премиум пользователям'
-        await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
-
-'''Запрос количества постов'''
-
-@dp.message_handler(state=ChatComments.waiting_link)
-async def get_discussion_users(message: types.Message, state: FSMContext):
-    await state.update_data(waiting_link=message.text)
-    await message.answer(text='Теперь введите количество последних постов для парсинга (не более 100)')
-    await ChatComments.count_posts.set()
 
 '''Кнопка писавшие в чат'''
 
@@ -186,7 +151,7 @@ async def get_open_report(message: types.Message, state: FSMContext):
     target = '*.txt'
     file = glob.glob(target)[0] 
     with open(file, "w", encoding="utf-8") as write_file:
-        for participant in ALL_PARTICIPANTS:
+        for participant in ALL_PARTICIPANTS[0:100]:
             if participant.username != None and participant.bot == False and participant.fake == False:
                 write_file.writelines(f"@{participant.username}\n")
     uniqlines = set(open(file,'r', encoding='utf-8').readlines())
@@ -197,6 +162,20 @@ async def get_open_report(message: types.Message, state: FSMContext):
     await message.reply_document(open(file, 'rb'))
     await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
 
+'''Парсинг писавших в чат'''
+
+@dp.callback_query_handler(state=ParsingInChat.waiting_link)
+async def parsing_in_chat_start(callback_query: types.CallbackQuery, state: FSMContext): 
+    await state.update_data(last_activity=callback_query.data)
+    state_data = await state.get_data()
+    link = state_data.get('waiting_link')
+    date = state_data.get('last_activity').split('_')[1]
+    if date == 'all':
+        hours = 0
+    else:
+        hours = int(date)
+    await bot.send_message(callback_query.from_user.id, text='Начинаю парсинг, это может занять от 10 до 15 минут⏱', parse_mode='Markdown')
+    upload_message = await bot.send_message(callback_query.from_user.id, text='Идёт парсинг')
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

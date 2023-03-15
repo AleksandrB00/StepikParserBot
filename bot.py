@@ -7,6 +7,7 @@ from telethon.tl.functions.channels import GetParticipantsRequest
 from telethon.tl.types import ChannelParticipantsSearch
 
 import logging
+import glob
 
 from settings import bot_settings
 from bot_menu import menu
@@ -21,12 +22,12 @@ logging.basicConfig(
     datefmt='%H:%M:%S',
     )
 
+client = TelegramClient(bot_settings.SESSION_NAME, bot_settings.API_ID, bot_settings.API_HASH)
+client.start()
+
 bot = Bot(token=bot_settings.BOT_TOKEN)
 storage = MemoryStorage() 
 dp = Dispatcher(bot, storage=storage)
-
-client = TelegramClient(bot_settings.SESSION_NAME, bot_settings.API_ID, bot_settings.API_HASH)
-client.start()
 
 '''Состояния'''
 
@@ -169,14 +170,12 @@ async def get_open_report(message: types.Message, state: FSMContext):
     link = state_data.get('waiting_link')
     channel = await client.get_entity(link)
     await bot.send_message(message.chat.id, text='Начинаю парсинг, это может занять от 10 до 15 минут⏱')
-    upload_message = await bot.send_message(message.chat.id, text='Идёт парсинг: 0%')
+    upload_message = await bot.send_message(message.chat.id, text='Идёт парсинг: 0% [..........]')
     ALL_PARTICIPANTS = []
     for key in bot_settings.QUERY:
         progress = (bot_settings.QUERY.index(key)+1)*100/len(bot_settings.QUERY)
-        progress_bar = float('{:.0f}'.format(progress))
-        print(progress_bar)
-        progress = float('{:.2f}'.format(progress))
-        await upload_message.edit_text(text=f'Идёт парсинг: {progress}%')
+        completion_percentage = float('{:.2f}'.format(progress))
+        await upload_message.edit_text(text=f'Идёт парсинг: {completion_percentage}% [{"*"*(int(progress)//10)}{"."*(10-int(progress)//10)}]')
         OFFSET_USER = 0
         while True:
             participants = await client(GetParticipantsRequest(channel, ChannelParticipantsSearch(key), OFFSET_USER, bot_settings.LIMIT_USER, hash=0))
@@ -184,10 +183,21 @@ async def get_open_report(message: types.Message, state: FSMContext):
                 break
             ALL_PARTICIPANTS.extend(participants.users)
             OFFSET_USER += len(participants.users)
+    target = '*.txt'
+    file = glob.glob(target)[0] 
+    with open(file, "w", encoding="utf-8") as write_file:
+        for participant in ALL_PARTICIPANTS:
+            if participant.username != None and participant.bot == False and participant.fake == False:
+                write_file.writelines(f"@{participant.username}\n")
+    uniqlines = set(open(file,'r', encoding='utf-8').readlines())
+    open(file,'w', encoding='utf-8').writelines(set(uniqlines))
+    await state.finish()
+    text = 'Для парсинга следующего чата выберите необходимое действие👇'
+    inline_markup = await menu.main_menu()
+    await message.reply_document(open(file, 'rb'))
+    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
 
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
-    with client:
-        client.loop.run_until_complete()
     

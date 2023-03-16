@@ -20,10 +20,6 @@ async def premium_parsing_menu():
             callback_data='parsing_activity'
     ))
     inline_markup.add(types.InlineKeyboardButton(
-        text='✍️Писавшие в чат', 
-        callback_data='parsing_in_chat'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
         text='📱Моб. телефоны', 
         callback_data='phones'
     ))
@@ -54,30 +50,6 @@ async def last_active_menu():
     inline_markup.add(types.InlineKeyboardButton(
             text='За 7 дней', 
             callback_data='online_168'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-        text='Отмена', 
-        callback_data='premium_parsing_menu'
-    ))
-    return inline_markup
-
-async def date_last_message_menu():
-    inline_markup = types.InlineKeyboardMarkup()
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За 1 день', 
-            callback_data='last_24'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За неделю', 
-            callback_data='last_168'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За месяц', 
-            callback_data='last_720'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='Всех', 
-            callback_data='last_all'
     ))
     inline_markup.add(types.InlineKeyboardButton(
         text='Отмена', 

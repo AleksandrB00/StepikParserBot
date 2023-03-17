@@ -32,28 +32,12 @@ async def premium_parsing_menu():
 async def last_active_menu():
     inline_markup = types.InlineKeyboardMarkup()
     inline_markup.add(types.InlineKeyboardButton(
-            text='За 1 час', 
-            callback_data='online_1'
+            text='Был(а) недавно', 
+            callback_data='online_recently'
     ))
     inline_markup.add(types.InlineKeyboardButton(
-            text='За 6 часов', 
-            callback_data='online_6'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За сутки', 
-            callback_data='online_24'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За 3 дня', 
-            callback_data='online_72'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-            text='За 7 дней', 
-            callback_data='online_168'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
-        text='Отмена', 
-        callback_data='premium_parsing_menu'
+            text='Был(а) на этой неделе', 
+            callback_data='online_week'
     ))
     return inline_markup
 

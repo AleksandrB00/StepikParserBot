@@ -2,19 +2,14 @@ from aiogram import Bot, Dispatcher, types, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
-from telethon.sync import TelegramClient
-from telethon.tl.functions.channels import GetParticipantsRequest
-from telethon.tl.types import ChannelParticipantsSearch
-from telethon.tl.functions.users import GetUsersRequest
-import telethon
 
 import logging
 import glob
-from datetime import datetime, timedelta, timezone
 
 from settings import bot_settings
 from bot_menu import menu
 from database import orm
+from request_report import request, create_report
 
 
 logging.basicConfig(
@@ -24,9 +19,6 @@ logging.basicConfig(
     format = "%(asctime)s - %(module)s - %(levelname)s - %(funcName)s: %(lineno)d - %(message)s",
     datefmt='%H:%M:%S',
     )
-
-client = TelegramClient(bot_settings.SESSION_NAME, bot_settings.API_ID, bot_settings.API_HASH)
-client.start()
 
 bot = Bot(token=bot_settings.BOT_TOKEN)
 storage = MemoryStorage() 
@@ -135,32 +127,13 @@ async def get_open_report(message: types.Message, state: FSMContext):
     await state.update_data(waiting_link=message.text)
     state_data = await state.get_data()
     link = state_data.get('waiting_link')
-    channel = await client.get_entity(link)
-    await bot.send_message(message.chat.id, text='Начинаю парсинг, это может занять от 10 до 15 минут⏱')
-    upload_message = await bot.send_message(message.chat.id, text='Идёт парсинг: 0% [..........]')
-    ALL_PARTICIPANTS = []
-    for key in bot_settings.QUERY:
-        progress = (bot_settings.QUERY.index(key)+1)*100/len(bot_settings.QUERY)
-        completion_percentage = float('{:.2f}'.format(progress))
-        await upload_message.edit_text(text=f'Идёт парсинг: {completion_percentage}% [{"*"*(int(progress)//10)}{"."*(10-int(progress)//10)}]')
-        OFFSET_USER = 0
-        while True:
-            participants = await client(GetParticipantsRequest(channel, ChannelParticipantsSearch(key), OFFSET_USER, bot_settings.LIMIT_USER, hash=0))
-            if not participants.users:
-                break
-            ALL_PARTICIPANTS.extend(participants.users)
-            OFFSET_USER += len(participants.users)
-    target = '*.txt'
-    file = glob.glob(target)[0] 
-    with open(file, "w", encoding="utf-8") as write_file:
-        for participant in ALL_PARTICIPANTS[0:100]:
-            if participant.username != None and participant.bot == False and participant.fake == False:
-                write_file.writelines(f"@{participant.username}\n")
-    uniqlines = set(open(file,'r', encoding='utf-8').readlines())
-    open(file,'w', encoding='utf-8').writelines(set(uniqlines))
+    ALL_PARTICIPANTS = await request.open_chat_request(link, message.chat.id)
+    await create_report.create_open_chat_report(ALL_PARTICIPANTS, 'users')
     await state.finish()
     text = 'Для парсинга следующего чата выберите необходимое действие👇'
     inline_markup = await menu.main_menu()
+    target = '*.txt'
+    file = glob.glob(target)[0]
     await message.reply_document(open(file, 'rb'))
     await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
 
@@ -172,67 +145,32 @@ async def parsing_activity_start(callback_query: types.CallbackQuery, state: FSM
     state_data = await state.get_data()
     link = state_data.get('waiting_link')
     online = state_data.get('last_activity').split('_')[1]
-    hours = int(online)
-    await bot.send_message(callback_query.from_user.id, text='Начинаю парсинг, это может занять от 10 до 15 минут⏱', parse_mode='Markdown')
-    upload_message = await bot.send_message(callback_query.from_user.id, text='Идёт парсинг: 0% [..........]')
-    current_time_utc =  datetime.now(timezone.utc)
-    target_time = current_time_utc - timedelta(hours=hours, minutes=0)
-    id_list = []
-    ALL_PARTICIPANTS = []
-    channel = await client.get_entity(link)
-    test = await client(GetUsersRequest([5761263022]))
-    for key in bot_settings.QUERY:
-        progress = (bot_settings.QUERY.index(key)+1)*100/len(bot_settings.QUERY)
-        completion_percentage = float('{:.2f}'.format(progress))
-        await upload_message.edit_text(text=f'Идёт парсинг: {completion_percentage}% [{"*"*(int(progress)//10)}{"."*(10-int(progress)//10)}]')
-        OFFSET_USER = 0
-        while True:
-            participants = await client(GetParticipantsRequest(channel, ChannelParticipantsSearch(key), OFFSET_USER, bot_settings.LIMIT_USER, hash=0))
-            if not participants.users:
-                break
-            ALL_PARTICIPANTS.extend(participants.users)
-            OFFSET_USER += len(participants.users)
-    for user in ALL_PARTICIPANTS:
-        id_list.append(user.id)
-    OFFSET_USER = 0
-    users_list = []
-    while True:
-        users = await client(GetUsersRequest(id_list[OFFSET_USER:]))
-        if len(users) == 0:
-            break
-        users_list.extend(users)
-        OFFSET_USER += len(users)
-    finish_list = []
-    for user in users_list:
-        if user.status.__class__ == telethon.tl.types.UserStatusRecently:
-            finish_list.append(user)
-            continue
-        if user.status.__class__ == telethon.tl.types.UserStatusOnline:
-            finish_list.append(user)
-            continue
-        if user.status.__class__ == telethon.tl.types.UserStatusLastWeek and hours == 168:
-            finish_list.append(user)
-            continue
-        if hasattr(user.status, 'was_online'):
-            if user.status.was_online > target_time:
-                finish_list.append(user)
-            if user.status.was_online < target_time:
-                continue
-    target = '*.txt'
-    file = glob.glob(target)[0] 
-    with open(file, "w", encoding="utf-8") as write_file:
-        for participant in finish_list:
-            if participant.username != None and participant.bot == False and participant.fake == False:
-                write_file.writelines(f"@{participant.username}\n")
-    uniqlines = set(open(file,'r', encoding='utf-8').readlines())
-    open(file,'w', encoding='utf-8').writelines(set(uniqlines))
+    ALL_PARTICIPANTS = await request.activity_request(link, callback_query.from_user.id, online)
+    await create_report.create_open_chat_report(ALL_PARTICIPANTS, 'users') 
     await state.finish()
+    target = '*.txt'
+    file = glob.glob(target)[0]
     text = 'Для парсинга следующего чата выберите необходимое действие👇'
     inline_markup = await menu.main_menu()
     await bot.send_document(callback_query.from_user.id, open(file, 'rb'))
     await bot.send_message(callback_query.from_user.id, text, reply_markup=inline_markup)
     
-                                             
+'''Прасинг телефонов'''
+
+@dp.message_handler(state=ParsingPhones.waiting_link)
+async def get_phone_numbers(message: types.Message, state: FSMContext):
+    await state.update_data(waiting_link=message.text)
+    state_data = await state.get_data()
+    link = state_data.get('waiting_link')
+    ALL_PARTICIPANTS = await request.open_chat_request(link, message.chat.id)
+    await create_report.create_open_chat_report(ALL_PARTICIPANTS, 'phones')
+    target = '*.txt'
+    file = glob.glob(target)[0] 
+    await state.finish()
+    text = 'Для парсинга следующего чата выберите необходимое действие👇'
+    inline_markup = await menu.main_menu()
+    await message.reply_document(open(file, 'rb'))
+    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')                                             
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

@@ -277,6 +277,39 @@ async def get_stat(callback_query: types.CallbackQuery):
     text = f'Всего пользователей: {stat[0]}\nУдалили чат с ботом: {stat[1]}\n*Количество удаливших чат с ботом обновляется после рассылки*'
     await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
 
+'''Кнопка купить премиум'''
+
+@dp.callback_query_handler(lambda call: 'buy_premium' in call.data)
+async def button_buy(callback_query: types.CallbackQuery):
+    await bot.send_invoice(
+    callback_query.from_user.id,
+    title='Покупка премиум статуса',
+    description='Покупка премиум статуса на 10 дней',
+    provider_token=bot_settings.PAYMENT_TOKEN,
+    currency='rub',
+    photo_url=bot_settings.IMAGE_URL,
+    photo_height=512, 
+    photo_width=512,
+    photo_size=512,
+    is_flexible=False, 
+    prices=[bot_settings.PRICE],
+    start_parameter='10-days-premium',
+    payload='something'
+)
+
+'''Валидация платёжных данных'''
+
+@dp.pre_checkout_query_handler(lambda query: True)
+async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_query.id, ok=True)
+
+'''Успешная оплата'''
+
+@dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
+async def process_successful_payment(message: types.Message):
+    pmnt = message.successful_payment.to_python()
+    await bot.send_message(message.chat.id,'Оплата прошла успешно')
+
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)
     

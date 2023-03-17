@@ -11,6 +11,10 @@ async def main_menu():
             text='🔒Premium функции', 
             callback_data='premium_menu'
     ))
+    inline_markup.add(types.InlineKeyboardButton(
+            text='👑Купить премиум статус', 
+            callback_data='buy_premium'
+    ))
     return inline_markup
 
 async def premium_parsing_menu():

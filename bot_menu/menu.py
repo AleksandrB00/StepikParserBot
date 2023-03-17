@@ -48,10 +48,6 @@ async def admin_menu():
             callback_data='create_mailing'
     ))
     inline_markup.add(types.InlineKeyboardButton(
-            text='Создать тестовую рассылку', 
-            callback_data='create_admin_mailing'
-    ))
-    inline_markup.add(types.InlineKeyboardButton(
             text='Статистика', 
             callback_data='stat'
     ))

@@ -307,7 +307,9 @@ async def process_pre_checkout_query(pre_checkout_query: types.PreCheckoutQuery)
 
 @dp.message_handler(content_types=types.ContentType.SUCCESSFUL_PAYMENT)
 async def process_successful_payment(message: types.Message):
-    pmnt = message.successful_payment.to_python()
+    current_time_utc =  datetime.now(timezone.utc)
+    target_time = current_time_utc + timedelta(hours=240, minutes=0)
+    orm.get_premium(message.from_user.id, current_time_utc, target_time)
     await bot.send_message(message.chat.id,'Оплата прошла успешно')
 
 if __name__ == '__main__':

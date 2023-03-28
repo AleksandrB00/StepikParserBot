@@ -38,6 +38,13 @@ class ParsingActive(StatesGroup):
 class ParsingPhones(StatesGroup):
     waiting_link = State()
 
+class ChatPrivateLink(StatesGroup):
+    waiting_link = State()
+
+class ParsingMessages(StatesGroup):
+    waiting_link = State()
+    count = State()
+
 class Mailing(StatesGroup):
     text = State()
     entity = State()
@@ -124,6 +131,24 @@ async def get_filter_activity(message: types.Message, state: FSMContext):
     await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
     await ParsingActive.last_activity.set()
 
+'''Кнопка писавшие в чат'''
+
+@dp.callback_query_handler(lambda call: 'parsing_messages' in call.data)
+async def parsing_activity_start(callback_query: types.CallbackQuery):
+    text = 'Отправьте ссылку на чат'
+    await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
+    await ParsingMessages.waiting_link.set()
+
+'''Запрос фильтра по сообщениям'''
+
+@dp.message_handler(state=ParsingMessages.waiting_link)
+async def get_filter_activity(message: types.Message, state: FSMContext):
+    await state.update_data(waiting_link=message.text)
+    inline_markup = await menu.messages_count_menu()
+    text = 'За какое время вам необходимы сообщения?'
+    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')
+    await ParsingMessages.count.set()
+
 '''Кнопка моб. телефоны'''
 
 @dp.callback_query_handler(lambda call: 'phones' in call.data)
@@ -131,6 +156,14 @@ async def parsing_phones(callback_query: types.CallbackQuery):
     text = 'Отправьте ссылку на чат'
     await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
     await ParsingPhones.waiting_link.set()
+
+'''Кнопка парсинг закрытого чата'''
+
+@dp.callback_query_handler(lambda call: 'parsing_private' in call.data)
+async def parsing_private_start(callback_query: types.CallbackQuery):
+    text = 'Отправьте ссылку на чат'
+    await bot.send_message(callback_query.from_user.id, text, parse_mode='Markdown')
+    await ChatPrivateLink.waiting_link.set()
 
 '''Прасинг открытого чата'''
 
@@ -182,7 +215,7 @@ async def get_phone_numbers(message: types.Message, state: FSMContext):
     text = 'Для парсинга следующего чата выберите необходимое действие👇'
     inline_markup = await menu.main_menu()
     await message.reply_document(open(file, 'rb'))
-    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')          
+    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown')         
 
 '''Вызов меню администратора'''                                   
 
@@ -311,6 +344,42 @@ async def process_successful_payment(message: types.Message):
     target_time = current_time_utc + timedelta(hours=240, minutes=0)
     orm.get_premium(message.from_user.id, current_time_utc, target_time)
     await bot.send_message(message.chat.id,'Оплата прошла успешно')
+
+'''Прасинг закрытого чата'''
+
+@dp.message_handler(state=ChatPrivateLink.waiting_link)
+async def get_private_report(message: types.Message, state: FSMContext):
+    await state.update_data(waiting_link=message.text)
+    state_data = await state.get_data()
+    link = state_data.get('waiting_link')
+    ALL_PARTICIPANTS = await request.private_chat_request(link, message.chat.id)
+    await create_report.create_open_chat_report(ALL_PARTICIPANTS, 'pyrogram')
+    await state.finish()
+    text = 'Для парсинга следующего чата выберите необходимое действие👇'
+    inline_markup = await menu.main_menu()
+    target = '*.txt'
+    file = glob.glob(target)[0]
+    await message.reply_document(open(file, 'rb'))
+    await message.answer(text, reply_markup=inline_markup, parse_mode='Markdown') 
+
+'''Парсинг по сообщениям'''
+
+@dp.callback_query_handler(state=ParsingMessages.count)
+async def parsing_activity_start(callback_query: types.CallbackQuery, state: FSMContext):
+    await state.update_data(count=callback_query.data)
+    state_data = await state.get_data()
+    link = state_data.get('waiting_link')
+    count = state_data.get('count').split('_')[1]
+    current_time = datetime.now(timezone.utc)
+    ALL_PARTICIPANTS = await request.chat_messages_request(link, callback_query.from_user.id, current_time, int(count))
+    await create_report.create_open_chat_report(ALL_PARTICIPANTS, 'pyrogram') 
+    await state.finish()
+    target = '*.txt'
+    file = glob.glob(target)[0]
+    text = 'Для парсинга следующего чата выберите необходимое действие👇'
+    inline_markup = await menu.main_menu()
+    await bot.send_document(callback_query.from_user.id, open(file, 'rb'))
+    await bot.send_message(callback_query.from_user.id, text, reply_markup=inline_markup)
 
 if __name__ == '__main__':
     executor.start_polling(dp, skip_updates=True)

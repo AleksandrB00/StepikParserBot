@@ -28,6 +28,14 @@ async def premium_parsing_menu():
         callback_data='phones'
     ))
     inline_markup.add(types.InlineKeyboardButton(
+        text='🔒Приватный чат', 
+        callback_data='parsing_private'
+    ))
+    inline_markup.add(types.InlineKeyboardButton(
+        text='✍️Парсинг писавших в чат', 
+        callback_data='parsing_messages'
+    ))
+    inline_markup.add(types.InlineKeyboardButton(
         text='🔙Назад', 
         callback_data='main_menu'
     ))
@@ -42,6 +50,22 @@ async def last_active_menu():
     inline_markup.add(types.InlineKeyboardButton(
             text='Был(а) на этой неделе', 
             callback_data='online_week'
+    ))
+    return inline_markup
+
+async def messages_count_menu():
+    inline_markup = types.InlineKeyboardMarkup()
+    inline_markup.add(types.InlineKeyboardButton(
+            text='Последние 100 сообщений', 
+            callback_data='messages_100'
+    ))
+    inline_markup.add(types.InlineKeyboardButton(
+            text='Последние 500 сообщений', 
+            callback_data='messages_500'
+    ))
+    inline_markup.add(types.InlineKeyboardButton(
+            text='Последняя 1000 сообщений', 
+            callback_data='messages_1000'
     ))
     return inline_markup
 
